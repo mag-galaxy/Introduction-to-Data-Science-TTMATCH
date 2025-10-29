@@ -1,95 +1,74 @@
 import pandas as pd
 import numpy as np
 
-from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from xgboost import XGBClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout, Masking
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-# ================================= parameters =================================
-DATA_FILE = "train.csv"
-TEST_FILE = "test.csv"
-RESULT_FILE = "111504504_submission.csv"
-TARGET = ["serverGetPoint", "actionId", "pointId"]
-FEAT_NOT_USED = ["sex", "match", "numberGame", "rally_id"]
-MY_MODELS = {}
+# ---------- 1. 讀取資料 ----------
+train = pd.read_csv("train.csv")
+test = pd.read_csv("test.csv")
 
-# ================================= functions =================================
-def TT_predict(training_data, testing_data, target):
-    training_data = training_data.sort_values(["rally_uid", "strokeNum"]).reset_index(drop=True)
+# ---------- 2. 資料前處理 ----------
+# 假設 train 裡有：rally_uid, shot_id, features..., is_end_shot (-1表示結束拍)
+# 我們先把資料依 rally_uid 分組
+train_groups = train.groupby("rally_uid")
 
-    # separate features and targets
-    X = training_data.drop(columns=["serverGetPoint"])
-    y = training_data["serverGetPoint"]
-    # le = LabelEncoder()
-    # y_encoded = le.fit_transform(y)
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+X, y = [], []
 
-    # train
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    # model = XGBClassifier(use_label_encoder=False, eval_metric='mlogloss')
-    # model = LogisticRegression(max_iter=1000)
-    model.fit(X_train, y_train)
+for _, df in train_groups:
+    df = df.sort_values("shot_id")
+    for k in range(1, len(df)):
+        # 取前 k-1 拍作為輸入，預測第 k 拍是否為結束拍
+        seq = df.iloc[:k][["feature1", "feature2", "feature3", ...]].values
+        label = (df.iloc[k]["is_end_shot"] == -1).astype(int)
+        X.append(seq)
+        y.append(label)
 
-    # validate
-    y_val_pred = model.predict(X_val)
+# 序列填補（不同長度）
+X_padded = pad_sequences(X, padding='post', dtype='float32')
+y = np.array(y)
 
-    # predict testing set
-    X_test = testing_data[X.columns]
-    y_pred = model.predict(X_test)
+# ---------- 3. 分割資料 ----------
+X_train, X_val, y_train, y_val = train_test_split(X_padded, y, test_size=0.1, random_state=42)
 
-    # print(classification_report(y_val, y_val_pred))
+# ---------- 4. 建立模型 ----------
+model = Sequential([
+    Masking(mask_value=0.0, input_shape=(X_padded.shape[1], X_padded.shape[2])),
+    LSTM(128, return_sequences=False),
+    Dropout(0.3),
+    Dense(64, activation='relu'),
+    Dropout(0.2),
+    Dense(1, activation='sigmoid')
+])
 
-    return y_pred
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+model.summary()
 
-def make_sequence_samples(df, target_cols, max_history=3):
-    """
-    把每個 rally_uid 展開成多筆樣本：
-    用前 t-1 拍的特徵 → 預測第 t 拍的 target。
-    """
-    all_samples = []
+# ---------- 5. 訓練 ----------
+model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=10, batch_size=128)
 
-    for rally_id, group in df.groupby("rally_uid"):
-        group = group.sort_values("strickNum")
-        # 從第2拍開始，每一拍都可當成「預測目標」
-        for t in range(1, len(group)):
-            current_row = group.iloc[t].copy()
-            # 取前最多 max_history 拍
-            history = group.iloc[max(0, t - max_history):t]
-            # 把歷史拍的平均 or 最後值作為特徵
-            features = history.mean(numeric_only=True).to_dict()
-            # 或者取最後一拍的特徵（更常見）
-            last_row = history.iloc[-1]
-            for col in history.columns:
-                features[f"prev_{col}"] = last_row[col]
-            # 標籤
-            for target in target_cols:
-                features[target] = current_row[target]
-            all_samples.append(features)
+# ---------- 6. 處理 test.csv ----------
+# test.csv 裡每個 rally_uid 只提供前 n-1 拍，我們要預測第 n 拍是否為結束拍
+test_groups = test.groupby("rally_uid")
+X_test = []
 
-    df_out = pd.DataFrame(all_samples)
-    return df_out
+for _, df in test_groups:
+    df = df.sort_values("shot_id")
+    seq = df[["feature1", "feature2", "feature3", ...]].values
+    X_test.append(seq)
 
-# ================================= main =================================
-# read data
-df_train = pd.read_csv(DATA_FILE)
-df_test = pd.read_csv(TEST_FILE)
-df_result = pd.read_csv(RESULT_FILE)
+X_test_padded = pad_sequences(X_test, padding='post', maxlen=X_padded.shape[1], dtype='float32')
 
-# check data shape
-print("train.csv shape: ", df_train.shape)
-print("train.csv headers: ", df_train.head())
-print("test.csv shape: ", df_test.shape)
-print("test.csv headers: ", df_test.head())
-print("submission.csv shape: ", df_result.shape)
-print("submission.csv headers: ", df_result.head())
+# ---------- 7. 預測 ----------
+preds = model.predict(X_test_padded)
+preds_label = (preds > 0.5).astype(int)
 
-# call functions for training and predict
-print("start processing...")
-
-df_result["serverGetPoint"] = TT_predict(df_train, df_test)
-
-# save result (prediction)
-df_result.to_csv(RESULT_FILE, index=False)
+# ---------- 8. 輸出結果 ----------
+submission = pd.DataFrame({
+    "rally_uid": test["rally_uid"].unique(),
+    "is_end_shot_pred": preds_label.flatten()
+})
+submission.to_csv("submission.csv", index=False)
