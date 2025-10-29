@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy
+import numpy as np
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
@@ -12,9 +12,12 @@ from sklearn.metrics import accuracy_score, classification_report
 DATA_FILE = "train.csv"
 TEST_FILE = "test.csv"
 RESULT_FILE = "111504504_submission.csv"
+TARGET = ["serverGetPoint", "actionId", "pointId"]
+FEAT_NOT_USED = ["sex", "match", "numberGame", "rally_id"]
+MY_MODELS = {}
 
 # ================================= functions =================================
-def TT_predict(training_data, testing_data):
+def TT_predict(training_data, testing_data, target):
     training_data = training_data.sort_values(["rally_uid", "strokeNum"]).reset_index(drop=True)
 
     # separate features and targets
@@ -41,6 +44,34 @@ def TT_predict(training_data, testing_data):
 
     return y_pred
 
+def make_sequence_samples(df, target_cols, max_history=3):
+    """
+    把每個 rally_uid 展開成多筆樣本：
+    用前 t-1 拍的特徵 → 預測第 t 拍的 target。
+    """
+    all_samples = []
+
+    for rally_id, group in df.groupby("rally_uid"):
+        group = group.sort_values("strickNum")
+        # 從第2拍開始，每一拍都可當成「預測目標」
+        for t in range(1, len(group)):
+            current_row = group.iloc[t].copy()
+            # 取前最多 max_history 拍
+            history = group.iloc[max(0, t - max_history):t]
+            # 把歷史拍的平均 or 最後值作為特徵
+            features = history.mean(numeric_only=True).to_dict()
+            # 或者取最後一拍的特徵（更常見）
+            last_row = history.iloc[-1]
+            for col in history.columns:
+                features[f"prev_{col}"] = last_row[col]
+            # 標籤
+            for target in target_cols:
+                features[target] = current_row[target]
+            all_samples.append(features)
+
+    df_out = pd.DataFrame(all_samples)
+    return df_out
+
 # ================================= main =================================
 # read data
 df_train = pd.read_csv(DATA_FILE)
@@ -59,8 +90,6 @@ print("submission.csv headers: ", df_result.head())
 print("start processing...")
 
 df_result["serverGetPoint"] = TT_predict(df_train, df_test)
-# df_result["pointId"] = predict_serverGetPoint(df_train, df_test)
-# df_result["actionId"] = predict_serverGetPoint(df_train, df_test)
 
 # save result (prediction)
-df_result.to_csv(RESULT_FILE)
+df_result.to_csv(RESULT_FILE, index=False)
