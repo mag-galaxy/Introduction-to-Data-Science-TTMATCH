@@ -1,5 +1,5 @@
 ## Source
-https://www.kaggle.com/competitions/introduction-to-data-secience-2025-competition
+https://www.kaggle.com/competitions/introduction-to-data-secience-ttmatch/overview
 
 ## Tasks Description
 ### Next stroke (n-th shot) action type prediction(actionId)
