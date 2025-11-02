@@ -101,12 +101,6 @@ print("Training pointId model...")
 model_point = build_lstm_model(num_features, num_point_classes, "pointId")
 model_point.fit(X_tr, y_point_tr, epochs=EPOCHS, batch_size=128, validation_data=(X_val, y_point_val))
 
-# X_test = make_sequences(df_test, is_train=False)
-
-# pred_server = np.argmax(model_server.predict(X_test), axis=1)
-# pred_action = np.argmax(model_action.predict(X_test), axis=1)
-# pred_point  = np.argmax(model_point.predict(X_test), axis=1)
-
 rally_ids = []
 pred_server, pred_action, pred_point = [], [], []
 
@@ -142,6 +136,8 @@ df_submission["serverGetPoint"] = pred_server
 df_submission["actionId"] = pred_action
 df_submission["pointId"] = pred_point
 
+df_submission["actionId"] = df_submission["actionId"].replace(19, -1)
+df_submission["pointId"] = df_submission["pointId"].replace(10, -1)
 
 df_submission.to_csv(RESULT_FILE, index=False)
 print("result saved to ", RESULT_FILE)
