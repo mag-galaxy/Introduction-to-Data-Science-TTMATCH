@@ -19,12 +19,12 @@ RESULT_FILE = "111504504_submission.csv"
 TARGET = ["serverGetPoint", "actionId", "pointId"]
 FEAT_NOT_USED = ["rally_uid", "sex", "match", "numberGame", "rally_id", "strickNumber", "let"]
 FEATURES = [
-    "scoreSelf", "scoreOther", "gamePlayerId", "gamePlayerOtherId",
+    
     "serveId", "serveNumber", "strickId", "handId", 
     "strengthId", "spinId", "pointId", "actionId", "positionId"
 ]
 MAX_SEQ_LEN = 10
-EPOCHS =15
+EPOCHS = 15
 
 # ================================= functions =================================
 def make_sequences(df, is_train):
