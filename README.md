@@ -1,14 +1,19 @@
-## Source
+## Competition Link
 https://www.kaggle.com/competitions/introduction-to-data-secience-ttmatch/overview
 
 ## Tasks Description
-### Next stroke (n-th shot) action type prediction(actionId)
-Predict which `action type` the opponent will use for the next return.
+1. Next stroke (n-th shot) action type prediction: `actionId`
+2. Next stroke (n-th shot) landing location prediction: `pointId`
+3. Current rally outcome prediction: `serverGetPoint`
 
----
-### Next stroke (n-th shot) landing location prediction(pointId)
-Predict `where the ball will land` after the striker’s shot.
+## Environment Settings
+1. create a virtual environment with **Conda**
+2. install required packages (tensorflow...)
 
----
-### Current rally outcome prediction
-Giving the shots already played in the current rally, predict `which side will ultimately win the point`.
+## Data Preprocessing
+1. read `train.csv`
+
+## Model Training
+1. train 3 different models for predicting `serverGetPoint`, `actionId`, `pointId` respectively
+
+## Making Predictions
