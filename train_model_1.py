@@ -19,18 +19,16 @@ RESULT_FILE = "111504504_submission.csv"
 TARGET = ["serverGetPoint", "actionId", "pointId"]
 FEAT_NOT_USED = ["rally_uid", "sex", "match", "numberGame", "rally_id", "strickNumber", "let"]
 FEATURES = [
-    
     "serveId", "serveNumber", "strickId", "handId", 
     "strengthId", "spinId", "pointId", "actionId", "positionId"
 ]
-MAX_SEQ_LEN = 10
-EPOCHS = 15
+MAX_SEQ_LEN = 6
+EPOCHS = 20
 
 # ================================= functions =================================
 def make_sequences(df, is_train):
     X, y_server, y_action, y_point = [], [], [], []
     for rally_uid, group in df.groupby("rally_uid"):
-        # print("processing rally_uid: ", rally_uid)
         group = group.sort_values("strickNumber")
         seq = group[FEATURES].values.tolist()
         length = len(seq)
