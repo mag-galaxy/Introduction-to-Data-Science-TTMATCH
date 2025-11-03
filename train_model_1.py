@@ -1,11 +1,8 @@
 # ================================= libraries =================================
-import os
 import numpy as np
 import pandas as pd
-from collections import defaultdict
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
@@ -26,29 +23,25 @@ MAX_SEQ_LEN = 8
 EPOCHS = 30
 
 # ================================= functions =================================
-def make_sequences(df, is_train):
+def make_sequences(df):
     X, y_server, y_action, y_point = [], [], [], []
     for rally_uid, group in df.groupby("rally_uid"):
-        group = group.sort_values("strickNumber")
+        # seq is features of each strick in an unique rally
         seq = group[FEATURES].values.tolist()
-        length = len(seq)
+        strick_count = len(group)
         
-        # 每個rally構造多筆樣本: 使用前k拍預測第k+1拍
-        for k in range(1, length):
-            hist_seq = seq[:k]
-            hist_seq = pad_sequences([hist_seq[-MAX_SEQ_LEN:]], maxlen=MAX_SEQ_LEN, 
-                                     padding='pre', truncating='pre', value=0)[0]
-            X.append(hist_seq)
-            
-            if is_train:
-                y_server.append(group.iloc[k]["serverGetPoint"])
-                y_action.append(group.iloc[k]["actionId"])
-                y_point.append(group.iloc[k]["pointId"])
-    
-    if is_train:
-        return np.array(X), np.array(y_server), np.array(y_action), np.array(y_point)
-    else:
-        return np.array(X)
+        for window_size in range(1, min(strick_count, MAX_SEQ_LEN + 1)):
+            for k in range(0, strick_count - window_size):
+                hist_seq = seq[k:k+window_size]
+                hist_seq = pad_sequences([hist_seq[-MAX_SEQ_LEN:]], maxlen=MAX_SEQ_LEN, 
+                                        padding='pre', truncating='pre', value=0)[0]
+                # add features (X) and 3 targets (y)
+                X.append(hist_seq)
+                y_server.append(group.iloc[k+window_size]["serverGetPoint"])
+                y_action.append(group.iloc[k+window_size]["actionId"])
+                y_point.append(group.iloc[k+window_size]["pointId"])
+                 
+    return np.array(X), np.array(y_server), np.array(y_action), np.array(y_point)
 
 def build_lstm_model(num_features, num_classes, name):
     model = Sequential(name=name)
@@ -71,7 +64,13 @@ df_train["pointId"] = df_train["pointId"].replace(-1, 10)
 df_test["pointId"] = df_test["pointId"].replace(-1, 10)
 
 # group data with rally_uid
-X_train, y_server, y_action, y_point = make_sequences(df_train, True)
+X_train, y_server, y_action, y_point = make_sequences(df_train)
+np.save("X.npy", X_train)
+np.save("y_server.npy", y_server)
+np.save("y_action.npy", y_action)
+np.save("y_point.npy", y_point)
+
+print("✅ preprocessed data saved")
 
 # check data length
 num_features = len(FEATURES)
@@ -101,26 +100,31 @@ print("Training pointId model...")
 model_point = build_lstm_model(num_features, num_point_classes, "pointId")
 model_point.fit(X_tr, y_point_tr, epochs=EPOCHS, batch_size=128, validation_data=(X_val, y_point_val))
 
+# save models
+model_server.save("model_server.keras")
+model_action.save("model_action.keras")
+model_point.save("model_point.keras")
+
+print("✅ three models saved")
+
 rally_ids = []
 pred_server, pred_action, pred_point = [], [], []
 
 for rally_uid, group in df_test.groupby("rally_uid"):
-    # 取出該 rally 的全部球，轉成序列
     seq = group[FEATURES].values
 
-    # Padding 成固定長度
+    # data preprocessing for testing data: Padding
     seq_padded = pad_sequences([seq], maxlen=MAX_SEQ_LEN, dtype='float32', padding='pre', truncating='pre')
 
-    # 各模型預測下一球
+    # make prediction
     ps = model_server.predict(seq_padded)
     pa = model_action.predict(seq_padded)
     pp = model_point.predict(seq_padded)
 
-    # 取最大機率的類別
+    # add predictions
     pred_server.append(np.argmax(ps))
     pred_action.append(np.argmax(pa))
     pred_point.append(np.argmax(pp))
-
     rally_ids.append(rally_uid)
 
 # check data length align
