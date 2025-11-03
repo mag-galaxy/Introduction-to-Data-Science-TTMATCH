@@ -22,8 +22,8 @@ FEATURES = [
     "serveId", "serveNumber", "strickId", "handId", 
     "strengthId", "spinId", "pointId", "actionId", "positionId"
 ]
-MAX_SEQ_LEN = 6
-EPOCHS = 20
+MAX_SEQ_LEN = 8
+EPOCHS = 30
 
 # ================================= functions =================================
 def make_sequences(df, is_train):
@@ -73,6 +73,7 @@ df_test["pointId"] = df_test["pointId"].replace(-1, 10)
 # group data with rally_uid
 X_train, y_server, y_action, y_point = make_sequences(df_train, True)
 
+# check data length
 num_features = len(FEATURES)
 num_server_classes = len(np.unique(y_server))
 num_action_classes = len(np.unique(y_action))
@@ -81,6 +82,7 @@ num_point_classes  = len(np.unique(y_point))
 print("category count of server: ",num_server_classes)
 print("category count of action: ", num_action_classes)
 print("category count of point: ", num_point_classes)
+print("length of training sequence data: ", len(X_train))
 
 # train
 X_tr, X_val, y_server_tr, y_server_val = train_test_split(X_train, y_server, test_size=0.1, random_state=42)
