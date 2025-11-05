@@ -20,7 +20,7 @@ FEATURES = [
     "strengthId", "spinId", "pointId", "actionId", "positionId"
 ]
 MAX_SEQ_LEN = 8
-EPOCHS = 30
+EPOCHS = 40
 
 # ================================= functions =================================
 def make_sequences(df):
@@ -43,6 +43,33 @@ def make_sequences(df):
                  
     return np.array(X), np.array(y_server), np.array(y_action), np.array(y_point)
 
+def data_preprocessing(read_data):
+    if read_data:
+        # read train.csv
+        print("Loading train.csv...")
+        df_train = pd.read_csv(TRAIN_FILE)
+
+        # modify classes encoding
+        df_train["actionId"] = df_train["actionId"].replace(-1, 19)
+        df_train["pointId"] = df_train["pointId"].replace(-1, 10)
+
+        # group data with rally_uid and save sequences
+        X_train, y_server, y_action, y_point = make_sequences(df_train)
+        np.save("X.npy", X_train)
+        np.save("y_server.npy", y_server)
+        np.save("y_action.npy", y_action)
+        np.save("y_point.npy", y_point)
+        print("✅ preprocessed data saved")
+
+        return X_train, y_server, y_action, y_point
+    else:
+        # load exsiting data
+        X_train = np.load("X.npy")
+        y_server = np.load("y_server.npy")
+        y_action = np.load("y_action.npy")
+        y_point = np.load("y_point.npy")
+        return X_train, y_server, y_action, y_point
+
 def build_lstm_model(num_features, num_classes, name):
     model = Sequential(name=name)
     model.add(Masking(mask_value=0, input_shape=(MAX_SEQ_LEN, num_features)))
@@ -52,25 +79,13 @@ def build_lstm_model(num_features, num_classes, name):
     return model
 
 # ================================= main =================================
-# read data
-print("Loading data...")
-df_train = pd.read_csv(TRAIN_FILE)
+read_data = input("read train.csv and do data preprocessing?")
+X_train, y_server, y_action, y_point = data_preprocessing(int(read_data))
+
+# load test.csv
 df_test = pd.read_csv(TEST_FILE)
-df_submission = pd.read_csv(RESULT_FILE)
-
-df_train["actionId"] = df_train["actionId"].replace(-1, 19)
 df_test["actionId"] = df_test["actionId"].replace(-1, 19)
-df_train["pointId"] = df_train["pointId"].replace(-1, 10)
 df_test["pointId"] = df_test["pointId"].replace(-1, 10)
-
-# group data with rally_uid
-X_train, y_server, y_action, y_point = make_sequences(df_train)
-np.save("X.npy", X_train)
-np.save("y_server.npy", y_server)
-np.save("y_action.npy", y_action)
-np.save("y_point.npy", y_point)
-
-print("✅ preprocessed data saved")
 
 # check data length
 num_features = len(FEATURES)
@@ -136,6 +151,8 @@ assert len(pred_server) == len(pred_action) == len(pred_point) == len(rally_ids)
     f"❌ 預測結果長度不符：rally_ids={len(rally_ids)}, server={len(pred_server)}, action={len(pred_action)}, point={len(pred_point)}"
 
 # write result into submission.csv
+df_submission = pd.read_csv(RESULT_FILE)
+
 df_submission["serverGetPoint"] = pred_server
 df_submission["actionId"] = pred_action
 df_submission["pointId"] = pred_point
