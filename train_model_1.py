@@ -99,13 +99,23 @@ def build_multi_lstm_model(num_features, num_server_classes, num_action_classes,
 
     model = Model(inputs=inputs, outputs=[out_server, out_action, out_point], name="MultiTask_BiLSTM")
 
+    # ✅ 每個輸出各自對應 loss 和 metric
     model.compile(
         optimizer=Adam(1e-3),
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
+        loss={
+            "serverGetPoint": "sparse_categorical_crossentropy",
+            "actionId": "sparse_categorical_crossentropy",
+            "pointId": "sparse_categorical_crossentropy",
+        },
+        metrics={
+            "serverGetPoint": ["accuracy"],
+            "actionId": ["accuracy"],
+            "pointId": ["accuracy"],
+        }
     )
 
     return model
+
 # ================================= main =================================
 read_data = input("read train.csv and do data preprocessing?")
 X_train, y_server, y_action, y_point = data_preprocessing(int(read_data))
@@ -151,14 +161,25 @@ model = build_multi_lstm_model(
     num_action_classes=num_action_classes,
     num_point_classes=num_point_classes
 )
-model.fit(
-    X_tr,
-    [y_server_tr, y_action_tr, y_point_tr],
-    epochs=EPOCHS,
-    batch_size=128,
-    validation_data=(X_val, [y_server_val, y_action_val, y_point_val])
-)
-
+history = model.fit(
+        X_tr,
+        {
+            "serverGetPoint": y_server_tr,
+            "actionId": y_action_tr,
+            "pointId": y_point_tr,
+        },
+        epochs=EPOCHS,
+        batch_size=128,
+        validation_data=(
+            X_val,
+            {
+                "serverGetPoint": y_server_val,
+                "actionId": y_action_val,
+                "pointId": y_point_val,
+            }
+        ),
+        verbose = 2
+    )
 
 # save models
 # model_server.save("model_server.keras")
@@ -167,10 +188,10 @@ model.fit(
 # print("✅ three models saved")
 
 model.save("model_multitask.keras")
-print("✅ Multi-output model saved")
+print("✅ Multi-output model saved!")
 
 # predict test.csv
-rally_ids = []
+rally_ids = df_test["rally_uid"].unique()
 pred_server, pred_action, pred_point = [], [], []
 
 # for rally_uid, group in df_test.groupby("rally_uid"):
@@ -194,15 +215,12 @@ pred_server, pred_action, pred_point = [], [], []
 for rally_uid, group in df_test.groupby("rally_uid"):
     seq = group[FEATURES].values
     seq_padded = pad_sequences([seq], maxlen=MAX_SEQ_LEN, dtype='float32', padding='pre', truncating='pre')
-    
-    ps, pa, pp = model.predict(seq_padded)
+    ps, pa, pp = model.predict(seq_padded, verbose=0)
     pred_server.append(np.argmax(ps))
     pred_action.append(np.argmax(pa))
     pred_point.append(np.argmax(pp))
-    rally_ids.append(rally_uid)
 
 # check data length align
-rally_ids = df_test["rally_uid"].unique()
 print("len pred server: ", len(pred_server))
 print("len pred action: ", len(pred_action))
 print("len pred point: ", len(pred_point))
