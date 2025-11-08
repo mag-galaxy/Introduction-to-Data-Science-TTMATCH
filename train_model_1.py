@@ -24,7 +24,7 @@ FEATURES = [
     "strengthId", "spinId", "pointId", "actionId", "positionId"
 ]
 MAX_SEQ_LEN = 8
-EPOCHS = 30
+EPOCHS = 40
 
 # ================================= functions =================================
 def make_sequences(df):
@@ -68,10 +68,10 @@ def data_preprocessing(read_data):
         return X_train, y_server, y_action, y_point
     else:
         # load exsiting data
-        X_train = np.load("X.npy")
-        y_server = np.load("y_server.npy")
-        y_action = np.load("y_action.npy")
-        y_point = np.load("y_point.npy")
+        X_train = np.load("data_len_8/X.npy")
+        y_server = np.load("data_len_8/y_server.npy")
+        y_action = np.load("data_len_8/y_action.npy")
+        y_point = np.load("data_len_8/y_point.npy")
         return X_train, y_server, y_action, y_point
 
 def build_lstm_model(num_features, num_classes, name):
