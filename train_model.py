@@ -2,15 +2,12 @@
 import numpy as np
 import pandas as pd
 
-from sklearn.model_selection import train_test_split
-
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import LSTM, Dense, Masking
 from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.layers import Input, Embedding, Bidirectional, Flatten
-from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Embedding, Concatenate
 from tensorflow.keras.layers import TimeDistributed
 
 # ================================= parameters =================================
@@ -24,7 +21,11 @@ FEATURES = [
     "strengthId", "spinId", "pointId", "actionId", "positionId"
 ]
 MAX_SEQ_LEN = 8
-EPOCHS = 40
+EPOCHS = 35
+EMBED_DIM = 16
+VOCAB_SIZE = [3, 5, 5, 4, 5, 7, 11, 20, 5]
+
+df_train = pd.read_csv(TRAIN_FILE)
 
 # ================================= functions =================================
 def make_sequences(df):
@@ -49,10 +50,6 @@ def make_sequences(df):
 
 def data_preprocessing(read_data):
     if read_data:
-        # read train.csv
-        print("Loading train.csv...")
-        df_train = pd.read_csv(TRAIN_FILE)
-
         # modify classes encoding
         df_train["actionId"] = df_train["actionId"].replace(-1, 19)
         df_train["pointId"] = df_train["pointId"].replace(-1, 10)
@@ -74,46 +71,41 @@ def data_preprocessing(read_data):
         y_point = np.load("data_len_8/y_point.npy")
         return X_train, y_server, y_action, y_point
 
-def build_lstm_model(num_features, num_classes, name):
-    model = Sequential(name=name)
-    model.add(Masking(mask_value=0, input_shape=(MAX_SEQ_LEN, num_features)))
-    model.add(LSTM(128))
-    model.add(Dense(num_classes, activation='softmax'))
-    model.compile(optimizer=Adam(1e-3), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model
+def build_multi_embedding_lstm(vocab_sizes, num_server_classes, num_action_classes, num_point_classes, embedding_dim=16):
+    inputs, embedded_features = [], []
 
-def build_multi_lstm_model(num_features, num_server_classes, num_action_classes, num_point_classes,
-                           embedding_dim=16):
-    inputs = Input(shape=(MAX_SEQ_LEN, num_features), name="input_sequence")
+    for i, feat in enumerate(FEATURES):
+        inp = Input(shape=(MAX_SEQ_LEN,), name=feat)
+        emb = Embedding(
+            input_dim=vocab_sizes[i], output_dim=embedding_dim,
+            mask_zero=True, name=f"{feat}_emb"
+        )(inp)
+        inputs.append(inp)
+        embedded_features.append(emb)
 
-    # ✅ Dense 投影層：模擬 Embedding 功能
-    x = TimeDistributed(Dense(embedding_dim, activation='relu'), name='feature_projection')(inputs)
+    x = Concatenate(name="concat_embeddings")(embedded_features)
+    x = LSTM(128, dropout=0.3, recurrent_dropout=0.3, name="shared_lstm")(x)
 
-    # ✅ 雙向 LSTM
-    x = Bidirectional(LSTM(128, dropout=0.3, recurrent_dropout=0.3), name="shared_bilstm")(x)
+    # multitask
+    out_server = Dense(num_server_classes, activation='softmax', name='serverGetPoint_out')(x)
+    out_action = Dense(num_action_classes, activation='softmax', name='actionId_out')(x)
+    out_point = Dense(num_point_classes, activation='softmax', name='pointId_out')(x)
 
-    # ✅ 多輸出頭
-    out_server = Dense(num_server_classes, activation='softmax', name='serverGetPoint')(x)
-    out_action = Dense(num_action_classes, activation='softmax', name='actionId')(x)
-    out_point  = Dense(num_point_classes,  activation='softmax', name='pointId')(x)
+    model = Model(inputs=inputs, outputs=[out_server, out_action, out_point], name="MultiFeature_MultiTask_LSTM")
 
-    model = Model(inputs=inputs, outputs=[out_server, out_action, out_point], name="MultiTask_BiLSTM")
-
-    # ✅ 每個輸出各自對應 loss 和 metric
     model.compile(
         optimizer=Adam(1e-3),
         loss={
-            "serverGetPoint": "sparse_categorical_crossentropy",
-            "actionId": "sparse_categorical_crossentropy",
-            "pointId": "sparse_categorical_crossentropy",
+            "serverGetPoint_out": "sparse_categorical_crossentropy",
+            "actionId_out": "sparse_categorical_crossentropy",
+            "pointId_out": "sparse_categorical_crossentropy",
         },
         metrics={
-            "serverGetPoint": ["accuracy"],
-            "actionId": ["accuracy"],
-            "pointId": ["accuracy"],
+            "serverGetPoint_out": ["accuracy"],
+            "actionId_out": ["accuracy"],
+            "pointId_out": ["accuracy"],
         }
     )
-
     return model
 
 # ================================= main =================================
@@ -126,7 +118,6 @@ df_test["actionId"] = df_test["actionId"].replace(-1, 19)
 df_test["pointId"] = df_test["pointId"].replace(-1, 10)
 
 # check data length
-num_features = len(FEATURES)
 num_server_classes = len(np.unique(y_server))
 num_action_classes = len(np.unique(y_action))
 num_point_classes  = len(np.unique(y_point))
@@ -137,88 +128,41 @@ print("category count of point: ", num_point_classes)
 print("length of training sequence data: ", len(X_train))
 
 # separate data
-X_tr, X_val, y_server_tr, y_server_val = train_test_split(X_train, y_server, test_size=0.1, random_state=42)
-_, _, y_action_tr, y_action_val = train_test_split(X_train, y_action, test_size=0.1, random_state=42)
-_, _, y_point_tr, y_point_val = train_test_split(X_train, y_point, test_size=0.1, random_state=42)
-
-# print("Training serverGetPoint model...")
-# model_server = build_lstm_model(num_features, num_server_classes, "serverGetPoint")
-# model_server.fit(X_tr, y_server_tr, epochs=EPOCHS, batch_size=128, validation_data=(X_val, y_server_val))
-
-# print("Training actionId model...")
-# model_action = build_lstm_model(num_features, num_action_classes, "actionId")
-# model_action.fit(X_tr, y_action_tr, epochs=EPOCHS, batch_size=128, validation_data=(X_val, y_action_val))
-
-# print("Training pointId model...")
-# model_point = build_lstm_model(num_features, num_point_classes, "pointId")
-# model_point.fit(X_tr, y_point_tr, epochs=EPOCHS, batch_size=128, validation_data=(X_val, y_point_val))
+def split_features(X): return [X[:, :, i] for i in range(X.shape[2])]
+X_tr, X_val, y_server_tr, y_server_val, y_action_tr, y_action_val, y_point_tr, y_point_val = train_test_split(
+    X_train, y_server, y_action, y_point, test_size=0.1, random_state=42)
+X_tr_list, X_val_list = split_features(X_tr), split_features(X_val)
 
 # modle settings and training
-print("Training multi-output LSTM model...")
-model = build_multi_lstm_model(
-    num_features=num_features,
-    num_server_classes=num_server_classes,
-    num_action_classes=num_action_classes,
-    num_point_classes=num_point_classes
-)
+print("\nTraining multi-embedding LSTM model...")
+model = build_multi_embedding_lstm(VOCAB_SIZE, num_server_classes, num_action_classes, num_point_classes, EMBED_DIM)
 history = model.fit(
-        X_tr,
-        {
-            "serverGetPoint": y_server_tr,
-            "actionId": y_action_tr,
-            "pointId": y_point_tr,
-        },
-        epochs=EPOCHS,
-        batch_size=128,
-        validation_data=(
-            X_val,
-            {
-                "serverGetPoint": y_server_val,
-                "actionId": y_action_val,
-                "pointId": y_point_val,
-            }
-        ),
-        verbose = 2
-    )
-
-# save models
-# model_server.save("model_server.keras")
-# model_action.save("model_action.keras")
-# model_point.save("model_point.keras")
-# print("✅ three models saved")
+    X_tr_list,
+    {"serverGetPoint_out": y_server_tr, "actionId_out": y_action_tr, "pointId_out": y_point_tr},
+    epochs=EPOCHS,
+    batch_size=128,
+    verbose=2,
+    validation_data=(X_val_list, {"serverGetPoint_out": y_server_val, "actionId_out": y_action_val, "pointId_out": y_point_val})
+)
 
 model.save("model_multitask.keras")
 print("✅ Multi-output model saved!")
 
 # predict test.csv
+print("\nstart predicting for test.csv ...")
 rally_ids = df_test["rally_uid"].unique()
 pred_server, pred_action, pred_point = [], [], []
 
-# for rally_uid, group in df_test.groupby("rally_uid"):
-#     seq = group[FEATURES].values
-
-#     # data preprocessing for testing data: Padding
-#     seq_padded = pad_sequences([seq], maxlen=MAX_SEQ_LEN, dtype='float32', padding='pre', truncating='pre')
-
-#     # make prediction
-#     ps = model_server.predict(seq_padded)
-#     pa = model_action.predict(seq_padded)
-#     pp = model_point.predict(seq_padded)
-
-#     # add predictions
-#     pred_server.append(np.argmax(ps))
-#     pred_action.append(np.argmax(pa))
-#     pred_point.append(np.argmax(pp))
-#     rally_ids.append(rally_uid)
-
-
 for rally_uid, group in df_test.groupby("rally_uid"):
     seq = group[FEATURES].values
-    seq_padded = pad_sequences([seq], maxlen=MAX_SEQ_LEN, dtype='float32', padding='pre', truncating='pre')
-    ps, pa, pp = model.predict(seq_padded, verbose=0)
+    seq_padded = pad_sequences([seq], maxlen=MAX_SEQ_LEN, padding='pre', truncating='pre', value=0)
+    X_test_list = [seq_padded[:, :, i] for i in range(seq_padded.shape[2])]
+    ps, pa, pp = model.predict(X_test_list, verbose=2)
     pred_server.append(np.argmax(ps))
     pred_action.append(np.argmax(pa))
     pred_point.append(np.argmax(pp))
+
+print(f"Prediction complete for {len(rally_ids)} rallies")
 
 # check data length align
 print("len pred server: ", len(pred_server))
