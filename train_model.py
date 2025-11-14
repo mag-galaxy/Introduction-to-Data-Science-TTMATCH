@@ -23,10 +23,11 @@ FEATURES = [
     "serveId", "serveNumber", "strickId", "handId", 
     "strengthId", "spinId", "pointId", "actionId", "positionId"
 ]
-MAX_SEQ_LEN = args.sequence_len
+MAX_SEQ_LEN = int(args.sequence_len)
 FOLDER_NAME = f"data_len_{MAX_SEQ_LEN}"
 EPOCHS = 40
 EMBED_DIM = 16
+BATCH = 64
 VOCAB_SIZE = [3, 5, 5, 4, 5, 7, 11, 20, 5]
 
 # ================================= functions =================================
@@ -43,7 +44,8 @@ def build_multi_embedding_lstm(vocab_sizes, num_server_classes, num_action_class
         embedded_features.append(emb)
 
     x = Concatenate(name="concat_embeddings")(embedded_features)
-    x = LSTM(128, dropout=0.3, recurrent_dropout=0.3, name="shared_lstm")(x)
+    x = LSTM(128, dropout=0.3, recurrent_dropout=0.3, name="shared_lstm", return_sequences=True)(x)
+    x = LSTM(64)(x)
 
     # multitask
     out_server = Dense(num_server_classes, activation='softmax', name='serverGetPoint_out')(x)
@@ -98,7 +100,7 @@ history = model.fit(
     X_tr_list,
     {"serverGetPoint_out": y_server_tr, "actionId_out": y_action_tr, "pointId_out": y_point_tr},
     epochs=EPOCHS,
-    batch_size=128,
+    batch_size=BATCH,
     verbose=2,
     validation_data=(X_val_list, {"serverGetPoint_out": y_server_val, "actionId_out": y_action_val, "pointId_out": y_point_val})
 )
