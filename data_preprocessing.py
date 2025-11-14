@@ -17,7 +17,7 @@ FEATURES = [
     "serveId", "serveNumber", "strickId", "handId", 
     "strengthId", "spinId", "pointId", "actionId", "positionId"
 ]
-MAX_SEQ_LEN = args.sequence_len
+MAX_SEQ_LEN = int(args.sequence_len)
 FOLDER_NAME = f"data_len_{MAX_SEQ_LEN}"
 
 # ================================= functions =================================
@@ -59,5 +59,7 @@ def data_preprocessing(file_path):
     return
 
 # ================================= main =================================
+print("create new folder...")
 os.makedirs(FOLDER_NAME, exist_ok=True)
+print("start data preprocessing...")
 data_preprocessing(TRAIN_FILE)
