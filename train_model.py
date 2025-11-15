@@ -25,27 +25,30 @@ FEATURES = [
 ]
 MAX_SEQ_LEN = int(args.sequence_len)
 FOLDER_NAME = f"data_len_{MAX_SEQ_LEN}"
-EPOCHS = 40
-EMBED_DIM = 16
+EPOCHS = 35
+# EMBED_DIM = 12
 BATCH = 64
 VOCAB_SIZE = [3, 5, 5, 4, 5, 7, 11, 20, 5]
+EMBED_DIMS = [2, 3, 3, 2, 3, 4, 6, 8, 3]
 
 # ================================= functions =================================
-def build_multi_embedding_lstm(vocab_sizes, num_server_classes, num_action_classes, num_point_classes, embedding_dim=16):
+def build_multi_embedding_lstm(vocab_sizes, num_server_classes, num_action_classes, num_point_classes, embedding_dims):
     inputs, embedded_features = [], []
 
-    for i, feat in enumerate(FEATURES):
-        inp = Input(shape=(MAX_SEQ_LEN,), name=feat)
+    inputs = [Input(shape=(MAX_SEQ_LEN,), name=f"feat_{i}") for i in range(len(vocab_sizes))]
+
+    for i, (v, dim) in enumerate(zip(vocab_sizes, embedding_dims)):
         emb = Embedding(
-            input_dim=vocab_sizes[i], output_dim=embedding_dim,
-            mask_zero=True, name=f"{feat}_emb"
-        )(inp)
-        inputs.append(inp)
+            input_dim=v,
+            output_dim=dim,
+            mask_zero=True,      # 允許 padding = 0
+            name=f"embed_{i}"
+        )(inputs[i])
         embedded_features.append(emb)
 
     x = Concatenate(name="concat_embeddings")(embedded_features)
-    x = LSTM(128, dropout=0.3, recurrent_dropout=0.3, name="shared_lstm", return_sequences=True)(x)
-    x = LSTM(64)(x)
+    x = LSTM(128, dropout=0.3, recurrent_dropout=0.3, name="shared_lstm")(x)
+    # x = LSTM(64)(x)
 
     # multitask
     out_server = Dense(num_server_classes, activation='softmax', name='serverGetPoint_out')(x)
@@ -95,7 +98,7 @@ X_tr_list, X_val_list = split_features(X_tr), split_features(X_val)
 
 # modle settings and training
 print("\nTraining multi-embedding LSTM model...")
-model = build_multi_embedding_lstm(VOCAB_SIZE, num_server_classes, num_action_classes, num_point_classes, EMBED_DIM)
+model = build_multi_embedding_lstm(VOCAB_SIZE, num_server_classes, num_action_classes, num_point_classes, EMBED_DIMS)
 history = model.fit(
     X_tr_list,
     {"serverGetPoint_out": y_server_tr, "actionId_out": y_action_tr, "pointId_out": y_point_tr},
