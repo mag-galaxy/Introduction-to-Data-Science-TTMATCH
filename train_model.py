@@ -29,7 +29,8 @@ EPOCHS = 35
 # EMBED_DIM = 12
 BATCH = 64
 VOCAB_SIZE = [3, 5, 5, 4, 5, 7, 11, 20, 5]
-EMBED_DIMS = [2, 3, 3, 2, 3, 4, 6, 8, 3]
+# EMBED_DIMS = [2, 3, 3, 2, 3, 4, 6, 8, 3]
+EMBED_DIMS = [12, 12, 12, 12, 12, 12, 12, 12, 12]
 
 # ================================= functions =================================
 def build_multi_embedding_lstm(vocab_sizes, num_server_classes, num_action_classes, num_point_classes, embedding_dims):
