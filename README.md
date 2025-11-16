@@ -10,6 +10,10 @@ https://www.kaggle.com/competitions/introduction-to-data-secience-ttmatch/overvi
 1. create a virtual environment with **Conda**
 2. install required packages (tensorflow...)
 
+:::
+Note: best score ver. only
+:::
+
 ## Data Preprocessing: `data+_preprocessing.py`
 main idea: in each `rally_uid`, use features of previous n stricks to predict `actionId`,`pointId` and `serverGetPoint` of next strick, n is set from 1 to `MAX_SEQ_LEN`
 
@@ -38,6 +42,12 @@ main idea: in each `rally_uid`, use features of previous n stricks to predict `a
 ## Model Training
 
 ## Making Predictions
+1. read `test.csv`, do the same replacement on `"actionId"` and `"pointId"`
+2. group testing data with `rally_uid`, padding sequences for them, just like what we do in data preprocessing stage
+3. feed features data to the model, making predictions and saving results
+4. check if length of results equals to rallys in the testing data file
+5. write results into csv, noted that we have to 
+undo the replacement on -1
 
 ## How to execute?
 place `train.csv`, `test.csv`, `data_preprocessing.py` and `train_model.py` under the same folder, then run instructions below:
