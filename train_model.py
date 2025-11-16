@@ -109,7 +109,7 @@ history = model.fit(
     validation_data=(X_val_list, {"serverGetPoint_out": y_server_val, "actionId_out": y_action_val, "pointId_out": y_point_val})
 )
 
-model.save("model_multitask.keras")
+model.save("lstm_multitask.keras")
 print("✅ Multi-output model saved!")
 
 # predict test.csv
