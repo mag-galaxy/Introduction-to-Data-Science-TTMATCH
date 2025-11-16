@@ -85,12 +85,6 @@ num_server_classes = len(np.unique(y_server))
 num_action_classes = len(np.unique(y_action))
 num_point_classes  = len(np.unique(y_point))
 
-# load test.csv
-print("load test.csv")
-df_test = pd.read_csv(TEST_FILE)
-df_test["actionId"] = df_test["actionId"].replace(-1, 19)
-df_test["pointId"] = df_test["pointId"].replace(-1, 10)
-
 # separate data
 def split_features(X): return [X[:, :, i] for i in range(X.shape[2])]
 X_tr, X_val, y_server_tr, y_server_val, y_action_tr, y_action_val, y_point_tr, y_point_val = train_test_split(
@@ -111,6 +105,12 @@ history = model.fit(
 
 model.save("lstm_multitask.keras")
 print("✅ Multi-output model saved!")
+
+# load test.csv
+print("load test.csv")
+df_test = pd.read_csv(TEST_FILE)
+df_test["actionId"] = df_test["actionId"].replace(-1, 19)
+df_test["pointId"] = df_test["pointId"].replace(-1, 10)
 
 # predict test.csv
 print("\nstart predicting for test.csv ...")

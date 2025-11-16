@@ -21,6 +21,24 @@ MAX_SEQ_LEN = int(args.sequence_len)
 FOLDER_NAME = f"data_len_{MAX_SEQ_LEN}"
 
 # ================================= functions =================================
+def make_sequences_1(df):
+    X, y_server, y_action, y_point = [], [], [], []
+    for rally_uid, group in df.groupby("rally_uid"):
+        seq = group[FEATURES].values.tolist()
+        length = len(group)
+
+        # 每個rally構造多筆樣本: 使用前k拍預測第k+1拍
+        for k in range(1, length):
+            hist_seq = seq[:k]
+            hist_seq = pad_sequences([hist_seq[-MAX_SEQ_LEN:]], maxlen=MAX_SEQ_LEN, 
+                                     padding='pre', truncating='pre', value=0)[0]
+            X.append(hist_seq)            
+            y_server.append(group.iloc[k]["serverGetPoint"])
+            y_action.append(group.iloc[k]["actionId"])
+            y_point.append(group.iloc[k]["pointId"])
+
+    return np.array(X), np.array(y_server), np.array(y_action), np.array(y_point)
+
 def make_sequences_2(df):
     X, y_server, y_action, y_point = [], [], [], []
     for rally_uid, group in df.groupby("rally_uid"):
@@ -39,24 +57,6 @@ def make_sequences_2(df):
                 y_action.append(group.iloc[k+window_size]["actionId"])
                 y_point.append(group.iloc[k+window_size]["pointId"])
                  
-    return np.array(X), np.array(y_server), np.array(y_action), np.array(y_point)
-
-def make_sequences_1(df):
-    X, y_server, y_action, y_point = [], [], [], []
-    for rally_uid, group in df.groupby("rally_uid"):
-        seq = group[FEATURES].values.tolist()
-        length = len(seq)
-
-        # 每個rally構造多筆樣本: 使用前k拍預測第k+1拍
-        for k in range(1, length):
-            hist_seq = seq[:k]
-            hist_seq = pad_sequences([hist_seq[-MAX_SEQ_LEN:]], maxlen=MAX_SEQ_LEN, 
-                                     padding='pre', truncating='pre', value=0)[0]
-            X.append(hist_seq)            
-            y_server.append(group.iloc[k]["serverGetPoint"])
-            y_action.append(group.iloc[k]["actionId"])
-            y_point.append(group.iloc[k]["pointId"])
-
     return np.array(X), np.array(y_server), np.array(y_action), np.array(y_point)
 
 def data_preprocessing(file_path):
