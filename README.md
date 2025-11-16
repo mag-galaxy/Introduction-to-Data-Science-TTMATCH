@@ -11,12 +11,19 @@ https://www.kaggle.com/competitions/introduction-to-data-secience-ttmatch/overvi
 2. install required packages (tensorflow...)
 
 ## Data Preprocessing
+see `data+_preprocessing.py`
 1. read `train.csv`
 
 ## Model Training
 1. train 3 different models for predicting `serverGetPoint`, `actionId`, `pointId` respectively
 
 ## Making Predictions
+
+## How to execute?
+```
+python
+
+```
 
 ## References
 1.  https://medium.com/data-scientists-playground/lstm-%E6%B7%B1%E5%BA%A6%E5%AD%B8%E7%BF%92-%E8%82%A1%E5%83%B9%E9%A0%90%E6%B8%AC-cd72af64413a
