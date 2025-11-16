@@ -18,7 +18,7 @@ FEATURES = [
 ]
 MAX_SEQ_LEN = 8
 FOLDER_NAME = f"data_len_{MAX_SEQ_LEN}"
-EPOCHS = 30
+EPOCHS = 40
 BATCH = 64
 VOCAB_SIZE = [3, 5, 5, 4, 5, 7, 11, 20, 5]
 
@@ -26,6 +26,7 @@ VOCAB_SIZE = [3, 5, 5, 4, 5, 7, 11, 20, 5]
 # 1. 自動依 vocab size 設定 embedding dimension
 # ------------------------------------------------------------
 def choose_embed_dim(vocab):
+    return 16
     if vocab <= 4:
         return 4
     elif vocab <= 8:
@@ -39,16 +40,18 @@ def choose_embed_dim(vocab):
 # 2. Transformer Encoder Block
 # ------------------------------------------------------------
 def transformer_block(x, head_size=32, ff_dim=64, num_heads=2, dropout=0.1):
+    embed_dim = x.shape[-1]  # 最重要！！！抓原本的 embedding 維度
+
     # Multi-head attention
     attn = MultiHeadAttention(num_heads=num_heads, key_dim=head_size // num_heads, dropout=dropout)(x, x)
-
+    
     # Add & Norm
     x = LayerNormalization(epsilon=1e-6)(x + attn)
 
-    # Feed-forward
+    # Feed-forward (output 必須回到 embed_dim)
     ffn = Sequential([
         Dense(ff_dim, activation="relu"),
-        Dense(head_size)
+        Dense(embed_dim)  # ⭐️ 改這裡！輸出維度必須與 x 相同才能做殘差連接
     ])
     ffn_out = ffn(x)
 
@@ -83,10 +86,10 @@ def build_transformer_multitask_model(vocab_sizes, num_server_classes, num_actio
     x = Concatenate(axis=-1)(embedded_features)
 
     # === Transformer Encoder (你可增加層數) ===
-    x = transformer_block(x, head_size=58, ff_dim=128, num_heads=2)
+    x = transformer_block(x, head_size=32, ff_dim=128, num_heads=2)
 
     # === (可選) 再加第二層 Transformer
-    # x = transformer_block(x, head_size=32, ff_dim=64, num_heads=2)
+    x = transformer_block(x, head_size=64, ff_dim=64, num_heads=2)
 
     # === 決策：序列 → 一個向量（用最後 time step 即下一球預測） ===
     x = Lambda(lambda t: t[:, -1, :])(x)
@@ -158,7 +161,7 @@ model.fit(
     verbose=2
 )
 
-model.save("model_multitask.keras")
+model.save("transformer_multitask.keras")
 print("✅ Multi-output model saved!")
 
 # predict test.csv
