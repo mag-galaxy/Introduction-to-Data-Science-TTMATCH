@@ -40,7 +40,7 @@ main idea: in each `rally_uid`, use features of previous `MAX_SEQ_LEN` stricks t
 1. create folder for saving preprocessed data
 2. call function `data_preprocessing`
 
-## Model Training `train_model.py`
+## Model Training and Predicting Testing Data `train_model.py`
 main idea: use **LSTM**, a model usually used for predicting stock price
 
 **parameters**
@@ -51,7 +51,7 @@ main idea: use **LSTM**, a model usually used for predicting stock price
 
 **def build_multi_embedding_lstm**
 1. embedding featrues one by one, then concatenate them
-2. set a one layerLSTM model
+2. set a one layer LSTM model
 3. model gives multi-task outputs (three different target)
 4. use `sparse_categorical_crossentropy` for integer label
 
@@ -60,11 +60,10 @@ main idea: use **LSTM**, a model usually used for predicting stock price
 2. split_features for separating data, then we can embedding each feature one by one
 3. call `build_multi_embedding_lstm` and train model
 4. read `test.csv`, do the same replacement on `"actionId"` and `"pointId"`
-5. group testing data with `rally_uid`, padding sequences for them, just like what we did in data preprocessing stage
-6. feed features data to the model, making predictions and saving results
-7. check if length of results equals to rallys in the testing data file
-8. write results into csv, noted that we have to 
-undo the replacement on -1
+5. group features from testing data with `rally_uid`, padding sequences for them, just like what we did in data preprocessing stage
+6. feed features data to the model, making predictions and storing results
+7. check if length of results equals to number of rallys in the testing data file
+8. write results into csv, noted that we have to undo the replacement on -1
 
 ## How to execute?
 place `train.csv`, `test.csv`, `data_preprocessing.py` and `train_model.py` under the same folder, then run instructions below:
@@ -73,6 +72,8 @@ conda activate <virtual environment name>
 python data_preprocessing.py
 python train_model.py
 ```
+
+see https://github.com/mag-galaxy/Introduction-to-Data-Science-TTMATCH for details of each submission
 
 ## References
 1.  https://medium.com/data-scientists-playground/lstm-%E6%B7%B1%E5%BA%A6%E5%AD%B8%E7%BF%92-%E8%82%A1%E5%83%B9%E9%A0%90%E6%B8%AC-cd72af64413a
